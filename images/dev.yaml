@@ -1,0 +1,8 @@
+name: tpl-dev
+description: Podman, GitHub CLI, Starship
+parent: tpl-minimal
+tools:
+  - tmux
+  - starship
+  - podman
+  - gh

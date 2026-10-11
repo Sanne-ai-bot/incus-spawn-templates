@@ -2,7 +2,9 @@
 
 Community template images and tool definitions for [incus-spawn](https://github.com/Sanne/incus-spawn).
 
-These extend the built-in image chain (`tpl-minimal` → `tpl-dev` → `tpl-java`) with project-specific environments that include pre-cloned repositories, build tools, and primed dependency caches.
+These extend isx's built-in `tpl-minimal` with project-specific environments that include pre-cloned repositories, build tools, and primed dependency caches.
+
+`tpl-dev` and `tpl-java` live here too. They used to ship with isx, which now marks its own copies deprecated and will drop them ([#1195](https://github.com/Sanne/incus-spawn/issues/1195)). The definitions here have the same names and contents, so with this directory on your search path they replace the built-ins without the deprecation warning, and templates you already built stay in sync.
 
 ## Setup
 
@@ -24,6 +26,8 @@ isx branch tpl-quarkus my-feature
 
 | Template | Parent | Description                                                          |
 |----------|--------|----------------------------------------------------------------------|
+| `tpl-dev` | `tpl-minimal` | Podman, GitHub CLI, Starship, tmux                                   |
+| `tpl-java` | `tpl-dev` | JDK 25 + Maven                                                       |
 | `tpl-quarkus` | `tpl-java` | Quarkus + quickstarts source, Podman, Gradle                         |
 | `tpl-hibernate-orm` | `tpl-java` | Hibernate ORM source, Podman, Gradle                                 |
 | `tpl-hibernate-reactive` | `tpl-hibernate-orm` | Hibernate Reactive source (includes ORM)                             |
