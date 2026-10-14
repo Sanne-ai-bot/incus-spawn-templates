@@ -30,6 +30,9 @@ packages:
   - qemu-system-aarch64-core
   - btrfs-progs
   - nmap-ncat
+  # Test suite: GitPreparationTest serves git:// fetches with `git daemon`,
+  # which Fedora ships separately from git.
+  - git-daemon
 repos:
   - url: https://github.com/Sanne/incus-spawn/
     path: ~/incus-spawn
