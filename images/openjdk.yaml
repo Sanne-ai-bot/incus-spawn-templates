@@ -1,8 +1,8 @@
 name: tpl-openjdk
-description: OpenJDK development (JDK 26 boot JDK + build deps + source)
+description: OpenJDK development (JDK 27 boot JDK + build deps + source)
 # Hangs directly off tpl-minimal (not the tpl-java chain) so the older JDK 25
 # from tpl-java is never installed: JDK mainline (28) requires a boot JDK of
-# 26/27/28, and a stray JDK 25 on JAVA_HOME/PATH only makes `configure` emit
+# 27/28, and a stray JDK 25 on JAVA_HOME/PATH only makes `configure` emit
 # confusing "incorrect JDK version" warnings. Everything the chain used to
 # provide that we still want is re-declared explicitly below.
 parent: tpl-minimal
