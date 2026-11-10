@@ -1,0 +1,17 @@
+name: tpl-isx-presentation
+parent: tpl-isx-base
+gui: true
+tools:
+  - claude: {model: claude-opus-5-5}
+  - zmx
+default-action: claude
+workdir: ~/isx-presentations
+packages:
+  - firefox
+  - npm
+repos:
+  - url: https://github.com/Sanne/isx-presentations/
+    branch: quarkus-insights
+    prime: cd deck && npm install && tools/fetch-memes.sh
+agent_note: |
+   This very environment is running within an instance of isx
