@@ -39,4 +39,7 @@ env:
     strategy: prepend
     separator: ":"
 
-verify: /opt/skara/bin/git-jcheck --version
+# git-skara, not git-jcheck: jcheck refuses to start outside a Git repository
+# before it reads --version, and the verify runs in the user's home.
+# git-skara --version works anywhere, and runs the bundled java all the same.
+verify: /opt/skara/bin/git-skara --version
