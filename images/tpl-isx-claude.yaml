@@ -1,0 +1,8 @@
+name: tpl-isx-claude
+description: isx - direct development terminal
+parent: tpl-isx-base
+tools:
+  - claude: {advisor-model: opus, model: claude-sonnet-5-5}
+  - herdr
+  - zmx
+default-action: claude
