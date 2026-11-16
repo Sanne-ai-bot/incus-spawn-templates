@@ -1,6 +1,7 @@
-# Checks every definition with the latest isx release, then builds the templates a change reaches
-# on a real Incus. A tool that isx does not know is skipped by `isx build` with a warning, and a
-# key it does not know is ignored, so the build alone would pass either: the check fails on both.
+# Checks every definition with the latest isx release, or the one ISX_CI_VERSION pins, then builds
+# the templates a change reaches on a real Incus. A tool that isx does not know is skipped by
+# `isx build` with a warning, and a key it does not know is ignored, so the build alone would pass
+# either: the check fails on both.
 #
 # Only `pull_request`, never `pull_request_target`: this runs the PR's definitions and scripts, so
 # it gets a read-only token and no secret.
@@ -29,15 +30,19 @@ jobs:
     timeout-minutes: 15
     outputs:
       templates: ${{ steps.reach.outputs.templates }}
+      isx-version: ${{ steps.isx.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
+      # The latest release, unless the repository variable ISX_CI_VERSION names one.
       - name: Install isx
+        id: isx
         env:
           GH_TOKEN: ${{ github.token }}
+          ISX_CI_VERSION: ${{ vars.ISX_CI_VERSION }}
         run: |
           python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -q && sudo apt-get install -y python3-yaml; }
           .github/scripts/install-isx.sh
@@ -107,9 +112,11 @@ jobs:
       - name: Allow unprivileged user namespaces
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
+      # The release the check job resolved, so a release published in between cannot split them.
       - name: Install isx
         env:
           GH_TOKEN: ${{ github.token }}
+          ISX_CI_VERSION: ${{ needs.check.outputs.isx-version }}
         run: |
           python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -q && sudo apt-get install -y python3-yaml; }
           .github/scripts/install-isx.sh

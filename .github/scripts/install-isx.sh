@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Installs isx and isx-proxy from a release of Sanne/incus-spawn into ~/.local/bin, each checked
 # against the release's SHA256SUMS. The release is $ISX_CI_VERSION, or the latest one: the templates
-# are checked with the isx their users install. Needs gh with a token in $GH_TOKEN.
+# are checked with the isx their users install. In Actions it writes the release to the step's
+# output 'version'. Needs gh with a token in $GH_TOKEN.
 set -euo pipefail
 
 repo=Sanne/incus-spawn
@@ -31,5 +32,8 @@ install -m 755 "$dir/$cli" "$HOME/.local/bin/isx"
 install -m 755 "$dir/$proxy" "$HOME/.local/bin/isx-proxy"
 if [ -n "${GITHUB_PATH:-}" ]; then
   echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+fi
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  echo "version=$version" >> "$GITHUB_OUTPUT"
 fi
 "$HOME/.local/bin/isx" --version
