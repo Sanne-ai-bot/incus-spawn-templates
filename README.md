@@ -126,3 +126,21 @@ any agent that can run a shell command.
 ## Contributing
 
 To add a new template, create a YAML file in `images/` — see the [incus-spawn documentation](https://github.com/Sanne/incus-spawn) for the image definition format. Custom tools go in `tools/`.
+
+### CI
+
+Every pull request runs `.github/workflows/ci.yml` with the latest isx release.
+
+The `check definitions` job loads every template and tool through isx.
+It fails when isx does not load exactly one definition from a file, warns about a file, or reports a finding on a template.
+It also fails when a template lists a tool isx does not know, which `isx build` would skip with only a warning.
+
+The `build` jobs then build the templates the change reaches on a real Incus, one job per template.
+A changed template is built, and so is every template that lists a changed tool.
+A changed tool that no template here lists is built alone, in a template `ci-tool-<tool>` on `tpl-dev`.
+A change to the CI alone builds `tpl-tamboui`.
+Building a template builds its parents, but not the templates that inherit from it.
+
+`templates` is the one check to require: it fails when either job fails.
+To build other templates, run the workflow by hand with their names, or `all`.
+The repository variable `ISX_CI_VERSION` pins the isx release, such as `v0.5.2`; both jobs use the one the check resolved.
