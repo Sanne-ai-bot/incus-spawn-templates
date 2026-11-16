@@ -107,3 +107,4 @@ run_as_user:
     fi
 
 verify: pinchtab --version
+# CI test: touch only this tool
