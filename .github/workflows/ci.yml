@@ -144,7 +144,11 @@ jobs:
       - name: Build ${{ matrix.template }}
         env:
           TEMPLATE: ${{ matrix.template }}
-        run: sg incus-admin -c "isx build --yes --verbose '$TEMPLATE'"
+        run: |
+          if [[ $TEMPLATE == ci-tool-* ]]; then
+            .github/scripts/definitions.py tool-template "$TEMPLATE"
+          fi
+          sg incus-admin -c "isx build --yes --verbose '$TEMPLATE'"
 
       - name: Disk use
         if: always()

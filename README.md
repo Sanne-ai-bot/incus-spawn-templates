@@ -137,8 +137,10 @@ It also fails when a template lists a tool isx does not know, which `isx build` 
 
 The `build` jobs then build the templates the change reaches on a real Incus, one job per template.
 A changed template is built, and so is every template that lists a changed tool.
+A changed tool that no template here lists is built alone, in a template `ci-tool-<tool>` on `tpl-dev`.
 A change to the CI alone builds `tpl-tamboui`.
 Building a template builds its parents, but not the templates that inherit from it.
 
 `templates` is the one check to require: it fails when either job fails.
 To build other templates, run the workflow by hand with their names, or `all`.
+The repository variable `ISX_CI_VERSION` pins the isx release, such as `v0.5.2`; both jobs use the one the check resolved.
