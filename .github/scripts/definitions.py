@@ -13,6 +13,9 @@
       Print, as a JSON list, the templates to build for the changes since <base-ref>.
   definitions.py pick <names>
       The same list for templates asked for by name, space-separated, or 'all' for every one.
+  definitions.py tool-template <name>
+      Write the template a name from reach's list stands for when it starts with ci-tool-: one
+      tool on tpl-dev, for a changed tool that no template here lists.
 
 check and reach expect isx on PATH and config.yaml written by configure. They read isx's
 --format=json output, which is a contract; of isx's warnings, check reads only whether one names
@@ -35,6 +38,11 @@ TOOLS = os.path.join(ROOT, "tools")
 # the workflow still proves the build path: tpl-dev, tpl-java and tpl-mydev under it, a repository
 # clone with a prime, and this repository's own gradle tool.
 CANARY = ["tpl-tamboui"]
+
+# A changed tool that no template here lists is built on its own, in a template reach names with
+# this prefix and tool-template writes, so that a tool only users' templates list is built too.
+TOOL_TEMPLATE_PREFIX = "ci-tool-"
+TOOL_TEMPLATE_PARENT = "tpl-dev"
 
 
 def isx(*args, check=True, quiet=False):
@@ -205,12 +213,17 @@ def minimal(templates, targets):
     every parent it is missing, so a target whose descendant is also a target is built in that
     descendant's job.
     """
+    def parent_of(name):
+        if name.startswith(TOOL_TEMPLATE_PREFIX) and name not in templates:
+            return TOOL_TEMPLATE_PARENT
+        return templates.get(name, {}).get("parent")
+
     def ancestors(name):
         seen = []
-        parent = templates.get(name, {}).get("parent")
+        parent = parent_of(name)
         while parent and parent not in seen:
             seen.append(parent)
-            parent = templates.get(parent, {}).get("parent")
+            parent = parent_of(parent)
         return seen
 
     covered = {a for t in targets for a in ancestors(t)}
@@ -251,11 +264,17 @@ def reach(base):
             closure(r, seen)
         return seen
 
+    unlisted = set(changed_tools)
     for name, t in templates.items():
         if ours(t) and changed_tools:
-            listed = tool_names(read_yaml(t["source"]).get("tools"))
-            if any(changed_tools & closure(n, set()) for n in listed):
+            reached = set().union(*(closure(n, set()) for n in tool_names(read_yaml(t["source"]).get("tools"))))
+            if changed_tools & reached:
                 targets.add(name)
+                unlisted -= reached
+    # One that another of them requires is built in that one's template (a cycle keeps both).
+    closures = {t: closure(t, set()) for t in unlisted}
+    targets.update(TOOL_TEMPLATE_PREFIX + t for t in unlisted
+                   if not any(t in closures[u] and u not in closures[t] for u in unlisted))
 
     if other and not targets:
         targets.update(CANARY)
@@ -272,6 +291,22 @@ def pick(requested):
     print(json.dumps(minimal(templates, set(names))))
 
 
+def tool_template(name):
+    if not name.startswith(TOOL_TEMPLATE_PREFIX):
+        sys.exit(f"{name} is not a tool template: its name starts with {TOOL_TEMPLATE_PREFIX}")
+    _, tools, _ = load()
+    tool = name[len(TOOL_TEMPLATE_PREFIX):]
+    if tool not in tools:
+        sys.exit(f"No tool named {tool}")
+    images = os.path.join(os.path.dirname(CONFIG), "images")
+    os.makedirs(images, exist_ok=True)
+    path = os.path.join(images, name + ".yaml")
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.safe_dump({"name": name, "description": f"CI: the {tool} tool alone",
+                        "parent": TOOL_TEMPLATE_PARENT, "tools": [tool]}, f, sort_keys=False)
+    print(f"Wrote {path}: {tool} on {TOOL_TEMPLATE_PARENT}")
+
+
 def main():
     if len(sys.argv) in (2, 3) and sys.argv[1] == "configure" and sys.argv[2:] in ([], ["--build"]):
         configure(build=sys.argv[2:] == ["--build"])
@@ -281,6 +316,8 @@ def main():
         reach(sys.argv[2])
     elif len(sys.argv) == 3 and sys.argv[1] == "pick":
         pick(sys.argv[2])
+    elif len(sys.argv) == 3 and sys.argv[1] == "tool-template":
+        tool_template(sys.argv[2])
     else:
         sys.exit(__doc__)
 
