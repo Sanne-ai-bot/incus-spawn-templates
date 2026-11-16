@@ -1,0 +1,173 @@
+# Checks every definition with the latest isx release, then builds the templates a change reaches
+# on a real Incus. A tool that isx does not know is skipped by `isx build` with a warning, and a
+# key it does not know is ignored, so the build alone would pass either: the check fails on both.
+#
+# Only `pull_request`, never `pull_request_target`: this runs the PR's definitions and scripts, so
+# it gets a read-only token and no secret.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      templates:
+        description: "Templates to build, space-separated, or 'all' (every template here: slow)"
+        required: true
+        default: tpl-tamboui
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check definitions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      templates: ${{ steps.reach.outputs.templates }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install isx
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -q && sudo apt-get install -y python3-yaml; }
+          .github/scripts/install-isx.sh
+
+      - name: Configure isx
+        run: .github/scripts/definitions.py configure
+
+      - name: Check the definitions
+        run: .github/scripts/definitions.py check
+
+      - name: Templates to build
+        id: reach
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          REQUESTED: ${{ inputs.templates }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            templates=$(.github/scripts/definitions.py pick "$REQUESTED")
+          else
+            templates=$(.github/scripts/definitions.py reach "$BASE")
+          fi
+          echo "Templates to build: $templates"
+          echo "templates=$templates" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build (${{ matrix.template }})
+    needs: check
+    if: needs.check.outputs.templates != '[]'
+    runs-on: ubuntu-24.04
+    # tpl-openjdk and tpl-graalvm-dev clone and prime repositories of several GB.
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJSON(needs.check.outputs.templates) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/share/swift
+          df -h /
+
+      # As incus-spawn's isx-integration-tests-native job prepares its runner.
+      - name: Install Incus
+        run: |
+          set -o pipefail
+          curl -fsSL https://pkgs.zabbly.com/key.asc | gpg --dearmor \
+            | sudo tee /etc/apt/keyrings/zabbly.gpg >/dev/null
+          codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+          echo "deb [signed-by=/etc/apt/keyrings/zabbly.gpg] https://pkgs.zabbly.com/incus/stable $codename main" \
+            | sudo tee /etc/apt/sources.list.d/zabbly-incus-stable.list
+          sudo apt-get update -q
+          sudo apt-get install -y -q incus btrfs-progs qemu-system-x86
+          sudo usermod -aG incus-admin "$USER"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Allow unprivileged user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install isx
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -q && sudo apt-get install -y python3-yaml; }
+          .github/scripts/install-isx.sh
+
+      - name: Initialize isx
+        run: |
+          sg incus-admin -c "isx init </dev/null"
+          # 'sudo incus admin init' leaves ~/.config/incus/ owned by root.
+          sudo chown -R "$USER:$USER" ~/.config/incus/ 2>/dev/null || true
+          # isx init adds the 'cow' btrfs pool without rewiring the default profile.
+          sg incus-admin -c "incus profile device set default root pool=cow"
+
+      # Without a GitHub account: the build clones public repositories anonymously (see configure).
+      - name: Configure isx
+        run: .github/scripts/definitions.py configure --build
+
+      - name: Start the proxy
+        run: |
+          gateway=$(sg incus-admin -c "incus network get incusbr0 ipv4.address" | cut -d/ -f1)
+          sg incus-admin -c "isx proxy start" > /tmp/proxy.out 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf "http://$gateway:18080/health" >/dev/null 2>&1; then
+              echo "Proxy ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/proxy.out
+          echo "::error::The proxy did not become healthy within 30s"
+          exit 1
+
+      - name: Build ${{ matrix.template }}
+        env:
+          TEMPLATE: ${{ matrix.template }}
+        run: sg incus-admin -c "isx build --yes --verbose '$TEMPLATE'"
+
+      - name: Disk use
+        if: always()
+        run: |
+          df -h /
+          sg incus-admin -c "incus storage info cow" || true
+
+      - name: Proxy log
+        if: failure()
+        run: tail -n 200 ~/.local/state/incus-spawn/proxy.log || true
+
+  # One check of a fixed name to require, whatever the matrix held: it fails when the check did,
+  # or any build did, and passes when nothing needed building.
+  result:
+    name: templates
+    needs: [check, build]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Result
+        env:
+          CHECK: ${{ needs.check.result }}
+          BUILD: ${{ needs.build.result }}
+        run: |
+          echo "check: $CHECK, build: $BUILD"
+          [ "$CHECK" = success ] && { [ "$BUILD" = success ] || [ "$BUILD" = skipped ]; }
