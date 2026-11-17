@@ -86,6 +86,33 @@ files:
 
           build/*/images/jdk/bin/java --version
 
+      ## Using the built JDK for HTTPS (Maven, Gradle)
+
+      Before the built JDK downloads anything over HTTPS (for example as
+      `JAVA_HOME` for a Maven or Gradle build), run:
+
+          isx-trust ~/jdk/build
+
+      Run it again after a build that rewrites the image (`make images`): the
+      build deletes and re-creates `images/jdk`, which puts a fresh `cacerts`
+      where the link was. Repeating the command is harmless.
+
+      Why: the built JDK carries its own `lib/security/cacerts`, which does not
+      hold the isx CA that this box's HTTPS proxy signs with. Downloads then
+      fail with `certificate_unknown` or `PKIX path building failed`.
+      `isx-trust` replaces that file with a link to the system store
+      (`/etc/pki/ca-trust/extracted/java/cacerts`), which does hold the isx CA.
+      Never turn certificate verification off instead.
+
+      Opt-in, only for a build that never leaves this box: adding
+      `--with-cacerts-file=/etc/pki/ca-trust/extracted/java/cacerts` to
+      `configure` makes every rebuild trust the system store with no further
+      step. It does so by **copying** that store into the JDK. A JDK built that
+      way and given to anyone else trusts this host's isx CA and any host CAs
+      propagated into the box, and nothing in the image says so. The link
+      copies no CA: on another machine it fails visibly. That is why the
+      configure lines above do not carry the flag.
+
       ## Test
 
           make test TEST=tier1                       # standard first tier
