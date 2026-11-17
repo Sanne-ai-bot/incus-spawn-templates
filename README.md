@@ -33,11 +33,12 @@ isx branch my-feature --from tpl-quarkus
 | `tpl-hibernate-orm` | `tpl-mydev` | Hibernate ORM source, Podman, Gradle, `idea-backend`                 |
 | `tpl-hibernate-reactive` | `tpl-hibernate-orm` | Hibernate Reactive source (includes ORM)                             |
 | `tpl-tamboui` | `tpl-mydev` | Tamboui TUI framework source, Gradle, `idea-backend`, selected skills |
-| `tpl-isx` | `tpl-mydev` | incus-spawn and its sibling repos, GraalVM, zmx, `/dev/kvm`          |
+| `tpl-isx-base` | `tpl-java` | incus-spawn and its sibling repos, GraalVM, the appliance kernel's build tools |
+| `tpl-isx-claude` | `tpl-isx-base` | Claude Code, herdr, zmx; opens in Claude |
 | `tpl-isx-review` | `tpl-isx-claude` | Reviews isx changes through a read-only GitHub account: it cannot push |
 | `tpl-graalvm-dev` | `tpl-dev` | GraalVM development — `mx`, labsjdk, the `oracle/graal` source |
 
-Most templates inherit the `tpl-java` chain, which provides JDK 25, Maven, Podman, GitHub CLI, Starship, and tmux. That chain has no Claude Code: the templates under `tpl-mydev` get it from there, and `tpl-graalvm-dev` has none.
+Most templates inherit the `tpl-java` chain, which provides JDK 25, Maven, Podman, GitHub CLI, Starship, and tmux. That chain has no Claude Code: the templates under `tpl-mydev` get it from there, `tpl-isx-claude` and `tpl-isx-review` from `tpl-isx-claude`, and `tpl-graalvm-dev` has none.
 
 ### Working on GraalVM
 
