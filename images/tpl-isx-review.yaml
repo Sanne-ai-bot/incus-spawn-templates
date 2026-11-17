@@ -1,5 +1,5 @@
 name: tpl-isx-review
-description: isx - review terminal; GitHub through a read-only account, so it cannot push
+description: isx - review terminal that cannot push; needs a read-only GitHub token (isx account add github)
 parent: tpl-isx-claude
 # The read-only GitHub account this template uses. isx does not check a token's scope, so the
 # name tells the user what to store here: see the README, "Reviewing with a read-only token".
