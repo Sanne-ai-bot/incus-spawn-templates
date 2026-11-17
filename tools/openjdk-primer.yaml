@@ -89,13 +89,20 @@ files:
       ## Using the built JDK for HTTPS (Maven, Gradle)
 
       Before the built JDK downloads anything over HTTPS (for example as
-      `JAVA_HOME` for a Maven or Gradle build), run:
+      `JAVA_HOME` for a Maven or Gradle build), run, after `make images`:
 
           isx-trust ~/jdk/build
 
-      Run it again after a build that rewrites the image (`make images`): the
-      build deletes and re-creates `images/jdk`, which puts a fresh `cacerts`
-      where the link was. Repeating the command is harmless.
+      Before the first `make images` there is nothing to link: the command
+      prints nothing and changes nothing. When it links something it prints
+      one line per JDK (`images/jdk`, the exploded `jdk`, and the
+      `support/interim-image`).
+
+      Run it again after a build that re-creates the image. A `make images`
+      after a change to the Java sources (for example in `java.base`) deletes
+      and re-creates `images/jdk`, which puts a regular `cacerts` back where
+      the link was; a `make images` with nothing to rebuild keeps the link.
+      Repeating the command is harmless.
 
       Why: the built JDK carries its own `lib/security/cacerts`, which does not
       hold the isx CA that this box's HTTPS proxy signs with. Downloads then
@@ -104,14 +111,34 @@ files:
       (`/etc/pki/ca-trust/extracted/java/cacerts`), which does hold the isx CA.
       Never turn certificate verification off instead.
 
+      **The link changes the JDK under test.** `test/jdk/sun/security/lib/cacerts/VerifyCACerts.java`
+      (run by `tier2`) checks the count and checksum of the image's `cacerts`,
+      so on a linked image it fails with `wrong checksum` and a certificate
+      count that is not the one it expects. That failure is the link, not your
+      change. Before running that test, put the build's own file back (replace
+      `<conf>` with your configuration, e.g. `linux-x86_64-server-release`):
+
+          cd ~/jdk/build/<conf>
+          cp --remove-destination support/modules_libs/java.base/security/cacerts \
+            images/jdk/lib/security/cacerts
+
+      and, if you test the exploded JDK (`build/<conf>/jdk`):
+
+          ln -sfn ../../../support/modules_libs/java.base/security/cacerts \
+            jdk/lib/security/cacerts
+
+      Run `isx-trust ~/jdk/build` again afterwards to use the JDK for HTTPS.
+
       Opt-in, only for a build that never leaves this box: adding
       `--with-cacerts-file=/etc/pki/ca-trust/extracted/java/cacerts` to
       `configure` makes every rebuild trust the system store with no further
-      step. It does so by **copying** that store into the JDK. A JDK built that
-      way and given to anyone else trusts this host's isx CA and any host CAs
+      step. It does so by **copying** that store into the JDK, so
+      `VerifyCACerts` fails on that build as well. A JDK built that way and
+      given to anyone else trusts this host's isx CA and any host CAs
       propagated into the box, and nothing in the image says so. The link
-      copies no CA: on another machine it fails visibly. That is why the
-      configure lines above do not carry the flag.
+      does not copy a CA: on Fedora or RHEL it resolves to that machine's own
+      store, and on a machine without that path it fails visibly. That is why
+      the configure lines above do not carry the flag.
 
       ## Test
 
