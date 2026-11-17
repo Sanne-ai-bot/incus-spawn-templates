@@ -6,7 +6,8 @@
       every account the templates name, so that a missing credential is no finding. With
       --build, no GitHub account: a build with a GitHub token asks GitHub whose it is, to set
       the git identity, and fails when it cannot. A run's own token belongs to no user, so a
-      build clones anonymously and stamps no identity.
+      build clones anonymously and stamps no identity. A template that pins a GitHub account
+      cannot be built that way, so reach and pick list its nearest parent that pins none.
   definitions.py check
       Load every definition through isx and fail on anything isx would skip, ignore or refuse.
   definitions.py reach <base-ref>
@@ -129,8 +130,7 @@ def configure(build):
                          f"definitions.py has no placeholder for that namespace: add one to PLACEHOLDERS")
             named[ns].add(account)
     if build:
-        if named["github"] != {"default"}:
-            sys.exit("A template pins a GitHub account, which a build here cannot have: see configure")
+        # reach and pick never list a template that pins one: they build its parent instead.
         del named["github"]
         config.pop("github", None)
     for ns, accounts in named.items():
@@ -207,27 +207,54 @@ def changed_files(base):
     return [line for line in out.splitlines() if line]
 
 
+def parent_of(templates, name):
+    if name.startswith(TOOL_TEMPLATE_PREFIX) and name not in templates:
+        return TOOL_TEMPLATE_PARENT
+    return templates.get(name, {}).get("parent")
+
+
+def ancestors(templates, name):
+    seen = []
+    parent = parent_of(templates, name)
+    while parent and parent not in seen:
+        seen.append(parent)
+        parent = parent_of(templates, parent)
+    return seen
+
+
+def pins_github(templates, name):
+    """Whether the template, or a template of this repository it inherits from, pins a GitHub account."""
+    for n in [name] + ancestors(templates, name):
+        t = templates.get(n)
+        if t and ours(t) and "github" in (read_yaml(t["source"]).get("accounts") or {}):
+            return True
+    return False
+
+
 def minimal(templates, targets):
     """
     The targets to build, less those another target's build covers: building a template builds
     every parent it is missing, so a target whose descendant is also a target is built in that
     descendant's job.
+
+    A target that pins a GitHub account cannot be built here (see configure), so its nearest
+    ancestor that pins none is built in its place, and the log says so. That checks everything
+    the target inherits; the check job has loaded and validated the target itself.
     """
-    def parent_of(name):
-        if name.startswith(TOOL_TEMPLATE_PREFIX) and name not in templates:
-            return TOOL_TEMPLATE_PARENT
-        return templates.get(name, {}).get("parent")
+    buildable = set()
+    for t in targets:
+        if not pins_github(templates, t):
+            buildable.add(t)
+            continue
+        stand_in = next((a for a in ancestors(templates, t) if not pins_github(templates, a)), None)
+        print(f"{t} pins a GitHub account, which a build here cannot have: "
+              + (f"building {stand_in} in its place" if stand_in else "nothing to build in its place"),
+              file=sys.stderr)
+        if stand_in:
+            buildable.add(stand_in)
 
-    def ancestors(name):
-        seen = []
-        parent = parent_of(name)
-        while parent and parent not in seen:
-            seen.append(parent)
-            parent = parent_of(parent)
-        return seen
-
-    covered = {a for t in targets for a in ancestors(t)}
-    return sorted(targets - covered)
+    covered = {a for t in buildable for a in ancestors(templates, t)}
+    return sorted(buildable - covered)
 
 
 def reach(base):
@@ -276,10 +303,12 @@ def reach(base):
     targets.update(TOOL_TEMPLATE_PREFIX + t for t in unlisted
                    if not any(t in closures[u] and u not in closures[t] for u in unlisted))
 
-    if other and not targets:
-        targets.update(CANARY)
+    # After minimal, which may drop a target that pins a GitHub account and has no stand-in.
+    build = minimal(templates, targets)
+    if other and not build:
+        build = minimal(templates, set(CANARY))
 
-    print(json.dumps(minimal(templates, targets)))
+    print(json.dumps(build))
 
 
 def pick(requested):
