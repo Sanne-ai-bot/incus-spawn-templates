@@ -34,6 +34,7 @@ isx branch my-feature --from tpl-quarkus
 | `tpl-hibernate-reactive` | `tpl-hibernate-orm` | Hibernate Reactive source (includes ORM)                             |
 | `tpl-tamboui` | `tpl-mydev` | Tamboui TUI framework source, Gradle, `idea-backend`, selected skills |
 | `tpl-isx` | `tpl-mydev` | incus-spawn and its sibling repos, GraalVM, zmx, `/dev/kvm`          |
+| `tpl-isx-review` | `tpl-isx-claude` | Reviews isx changes through a read-only GitHub account: it cannot push |
 | `tpl-graalvm-dev` | `tpl-dev` | GraalVM development — `mx`, labsjdk, the `oracle/graal` source |
 
 Most templates inherit the `tpl-java` chain, which provides JDK 25, Maven, Podman, GitHub CLI, Starship, and tmux. That chain has no Claude Code: the templates under `tpl-mydev` get it from there, and `tpl-graalvm-dev` has none.
@@ -58,6 +59,31 @@ from `mx fetch-jdk --list`) in your own template.
 `mx` validates TLS in Python rather than through the JVM truststore, so the `mx fetch-jdk`
 step in this build is also a good check that the isx MITM proxy's certificates satisfy
 OpenSSL 3.5+ strict verification.
+
+### Reviewing with a read-only token
+
+`tpl-isx-review` is for an agent that reviews a change and must not change GitHub. It pins a
+GitHub account of its own, so the proxy hands its instances only that account's token. isx does
+not check what a token may do, so the account's name is the promise: store a token there that can
+only read.
+
+Create a [fine-grained token](https://github.com/settings/personal-access-tokens/new) whose
+repository access is "Public repositories", which can only read. To review private repositories,
+select them instead and grant read-only Contents and Pull requests; such a token covers the
+repositories of one owner.
+
+Then store it with `isx account add github`. The first GitHub token isx gets is saved as the
+account `default`, without asking for a name, and every template without a pin uses it. So if you
+have no GitHub token in isx yet, run `isx account add github` once with your usual token first.
+Run it again with the read-only token, choose `a` to add a second account, and name it
+`readonly`.
+
+Until that account exists, `isx build tpl-isx-review` stops with an error that names the missing
+account, and so do `isx build --all`, `--missing`, `--out-of-sync` and `--with-descendants` when
+they would build it: they check every template first and build none of them. The pin binds the
+agent, not you: `isx account set <instance> github=<account>` still gives one instance another
+account. Any template whose instances must not change GitHub can pin the same account in its
+`accounts:`.
 
 ## Tools
 
