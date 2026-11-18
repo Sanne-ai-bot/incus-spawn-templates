@@ -1,7 +1,9 @@
 name: tpl-mydev
-description: Host-specific sharing layer
+description: Highly opinionated preferences - edit this!
 parent: tpl-java
 tools:
-  - claude
+  - claude: {model: claude-sonnet-5-5, advisor-model: opus}
+  - herdr
+  - zmx
 packages:
   - tig

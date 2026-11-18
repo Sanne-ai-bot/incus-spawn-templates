@@ -5,9 +5,10 @@ tools:
   - podman
   - graalvm
   - mvnd
-  - claude: {model: claude-sonnet-5}
+  - jasolo
 default-action: claude
 packages:
+  # The quarkus build literally requires unzip to be available
  - unzip
 repos:
   - url: https://github.com/quarkusio/quarkus.git

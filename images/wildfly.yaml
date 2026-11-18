@@ -1,6 +1,8 @@
 name: tpl-wildfly
 description: WildFly development (JDK + Maven + source)
 parent: tpl-mydev
+tools:
+  - maven-3
 repos:
   - url: https://github.com/wildfly/wildfly-core.git
     path: ~/wildfly-core

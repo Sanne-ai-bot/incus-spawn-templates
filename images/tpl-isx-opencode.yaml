@@ -1,0 +1,7 @@
+name: tpl-isx-opencode
+parent: tpl-isx-base
+tools:
+  - opencode: {model: claude-opus-5-5}
+  - herdr
+  - zmx
+default-action: opencode

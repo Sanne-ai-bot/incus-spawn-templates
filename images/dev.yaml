@@ -4,5 +4,4 @@ parent: tpl-minimal
 tools:
   - tmux
   - starship
-  - podman
   - gh

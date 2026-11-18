@@ -4,6 +4,8 @@ tools:
   - gh
   - maven-3
   - graalvm
+  - zmx
+default-action: claude
 workdir: ~/incus-spawn
 packages:
   - java-25-openjdk-devel
@@ -45,6 +47,5 @@ repos:
     depth: 1
   - url: https://github.com/tamboui/tamboui
   - url: https://github.com/quarkusio/quarkus.git
-  - url: https://github.com/Sanne/isx-presentations/
 agent_note: |
    This very environment is running within an instance of isx
