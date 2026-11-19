@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://isx.run/schema/template.json
 name: tpl-hibernate-reactive
 description: Hibernate Reactive development (JDK + Maven + source, includes Hibernate ORM sources)
 parent: tpl-hibernate-orm

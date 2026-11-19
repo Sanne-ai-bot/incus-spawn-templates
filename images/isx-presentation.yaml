@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://isx.run/schema/template.json
 name: tpl-isx-presentation
 parent: tpl-isx-base
 gui: true

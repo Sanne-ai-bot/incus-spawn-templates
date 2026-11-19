@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://isx.run/schema/tool.json
 name: mise
 description: mise tool version manager from the jdxcode/mise COPR, shims on PATH for login shells
 
