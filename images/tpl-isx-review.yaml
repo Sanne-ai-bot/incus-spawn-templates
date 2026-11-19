@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://isx.run/schema/template.json
 name: tpl-isx-review
 description: isx - review terminal that cannot push; needs a read-only GitHub token (isx account add github)
 parent: tpl-isx-claude
