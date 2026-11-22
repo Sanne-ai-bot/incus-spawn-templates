@@ -32,7 +32,11 @@ packages:
   # emulator is used, the other is listed for the same reason as above.
   - qemu-system-x86-core
   - qemu-system-aarch64-core
+  # Real Incus integration tests (scripts/local-incus.sh)
+  - incus
   - btrfs-progs
+  - jq
+  - virtiofsd
   - nmap-ncat
   # Test suite: GitPreparationTest serves git:// fetches with `git daemon`,
   # which Fedora ships separately from git.
@@ -50,3 +54,5 @@ repos:
   - url: https://github.com/quarkusio/quarkus.git
 agent_note: |
    This very environment is running within an instance of isx
+   For real Incus validation, run `./install.sh` then `scripts/local-incus.sh`.
+   Run Incus and isx commands as `sg incus-admin -c "..."` after setup.
