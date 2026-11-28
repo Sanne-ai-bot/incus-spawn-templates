@@ -5,10 +5,19 @@
 #
 # Only `pull_request`, never `pull_request_target`: this runs the PR's definitions and scripts, so
 # it gets a read-only token and no secret.
+#
+# Maven Central throttles a runner's shared address, so the build's proxy fetches a cold artifact
+# from Google's mirror of Central (`definitions.py configure --build`), and the proxy's artifact
+# caches are kept between runs in the Actions cache. A pull request's run can restore only its own
+# caches and the default branch's, so only runs on main save them, and a push to main builds what
+# it reached, to fill them. A pull request's own copies would share the repository's cache quota
+# and could evict main's, which every pull request restores.
 name: CI
 
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       templates:
@@ -56,12 +65,16 @@ jobs:
       - name: Templates to build
         id: reach
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           REQUESTED: ${{ inputs.templates }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             templates=$(.github/scripts/definitions.py pick "$REQUESTED")
           else
+            # A push that created the branch, or a force push, names a base this clone lacks.
+            if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+              BASE=HEAD~1
+            fi
             templates=$(.github/scripts/definitions.py reach "$BASE")
           fi
           echo "Templates to build: $templates"
@@ -133,6 +146,26 @@ jobs:
       - name: Configure isx
         run: .github/scripts/definitions.py configure --build
 
+      # The proxy's Maven, Gradle and npm caches from this template's newest run on main. Never
+      # another template's, so each cache holds only what its own template fetches. The paths are
+      # the save step's, word for word, since they make the cache's version and a restore finds
+      # only a cache of the same version. Each artifact is stored with its checksum and confirmed
+      # with its repository as the proxy's tiers say, as on any host. A '.' ends the template's
+      # name in the key, so tpl-leyden never restores tpl-leyden-quarkus's.
+      - name: Restore the proxy's caches
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/incus-spawn/maven-verified
+            ~/.cache/incus-spawn/gradle-verified
+            ~/.cache/incus-spawn/npm
+          key: proxy-cache-${{ matrix.template }}.${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            proxy-cache-${{ matrix.template }}.
+
+      - name: List the restored caches
+        run: .github/scripts/proxy-caches.sh > /tmp/proxy-caches.before
+
       - name: Start the proxy
         run: |
           gateway=$(sg incus-admin -c "incus network get incusbr0 ipv4.address" | cut -d/ -f1)
@@ -148,7 +181,9 @@ jobs:
           echo "::error::The proxy did not become healthy within 30s"
           exit 1
 
+      # Below the job's limit, so a build that runs out of time still saves what it fetched.
       - name: Build ${{ matrix.template }}
+        timeout-minutes: 160
         env:
           TEMPLATE: ${{ matrix.template }}
         run: |
@@ -166,6 +201,42 @@ jobs:
       - name: Proxy log
         if: failure()
         run: tail -n 200 ~/.local/state/incus-spawn/proxy.log || true
+
+      # Only on main (see the header). A failed build's artifacts are as sound as a passing one's,
+      # so they are kept too. The proxy stops first, so no download is still being written, and
+      # what it left half done, a *.tmp file, is deleted: the save takes every file in the three
+      # directories.
+      - name: Stop the proxy
+        id: proxy-stop
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+        run: |
+          # Longer than the proxy's own forced exit (ProxyService.STOP_FORCE_EXIT_SECONDS in incus-spawn).
+          pkill -x isx-proxy || true
+          for i in $(seq 1 40); do
+            pgrep -x isx-proxy >/dev/null || break
+            sleep 0.5
+          done
+          if pgrep -x isx-proxy >/dev/null; then
+            echo "The proxy is still running: its caches are not saved"
+            exit 0
+          fi
+          (cd ~/.cache/incus-spawn &&
+            find maven-verified gradle-verified npm -type f -name '*.tmp' -delete 2>/dev/null) || true
+          if [ "$(.github/scripts/proxy-caches.sh)" = "$(cat /tmp/proxy-caches.before 2>/dev/null)" ]; then
+            echo "The proxy's caches hold nothing new: not saved"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Save the proxy's caches
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && steps.proxy-stop.outputs.changed == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/incus-spawn/maven-verified
+            ~/.cache/incus-spawn/gradle-verified
+            ~/.cache/incus-spawn/npm
+          key: proxy-cache-${{ matrix.template }}.${{ github.run_id }}-${{ github.run_attempt }}
 
   # One check of a fixed name to require, whatever the matrix held: it fails when the check did,
   # or any build did, and passes when nothing needed building.

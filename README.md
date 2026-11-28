@@ -156,7 +156,7 @@ To add a new template, create a YAML file in `images/` — see the [incus-spawn 
 
 ### CI
 
-Every pull request runs `.github/workflows/ci.yml` with the latest isx release.
+Every pull request, and every push to `main`, runs `.github/workflows/ci.yml` with the latest isx release.
 
 The `check definitions` job loads every template and tool through isx.
 It fails when isx does not load exactly one definition from a file, warns about a file, or reports a finding on a template.
@@ -167,6 +167,11 @@ A changed template is built, and so is every template that lists a changed tool.
 A changed tool that no template here lists is built alone, in a template `ci-tool-<tool>` on `tpl-dev`.
 A change to the CI alone builds `tpl-tamboui`.
 Building a template builds its parents, but not the templates that inherit from it.
+Maven Central limits how often a runner's shared address may download, so the build's proxy fetches an artifact it lacks from Google's mirror of Central first.
+The proxy still confirms each mirrored copy with Central when it is next used.
+The proxy's Maven, Gradle and npm caches are kept between runs in the Actions cache, one per template, restored only by the same template.
+Only runs on `main` save them, since a pull request can restore only its own caches and those of `main`.
+So a push to `main` builds the templates it reached as well, to fill them.
 
 `templates` is the one check to require: it fails when either job fails.
 To build other templates, run the workflow by hand with their names, or `all`.
