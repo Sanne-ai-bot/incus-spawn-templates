@@ -8,6 +8,14 @@ packages:
   - zlib-devel
   - libstdc++-static
 
+# What a native build of a mid-sized Quarkus application needed, Maven and the native-image
+# builder together, with a 4 GiB builder heap, measured with this Oracle GraalVM 25.5
+# (incus-spawn docs/dev/PERFORMANCE-NOTES.md "A GraalVM native build"). A peak: native-image
+# holds it only while it runs. isx 0.6.0 and later raise a VM's default RAM to it.
+resources:
+  memory:
+    peak: 6656MiB
+
 downloads:
   - url: https://gds.oracle.com/download/graal/25i5/latest/graalvm-jdk-25i5-25_linux-x64_bin.tar.gz
     sha256: 90582f405cb89a825a43297cdacc7f427ce04039a249f5f0fc75c95b50600b08
