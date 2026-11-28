@@ -8,6 +8,9 @@
       the git identity, and fails when it cannot. A run's own token belongs to no user, so a
       build clones anonymously and stamps no identity. A template that pins a GitHub account
       cannot be built that way, so reach and pick list its nearest parent that pins none.
+      --build also names Google's mirror of Maven Central in maven-mirrors:, since Central
+      throttles a runner's shared address; the proxy still confirms each mirrored copy with
+      Central at its next use.
   definitions.py check
       Load every definition through isx and fail on anything isx would skip, ignore or refuse.
   definitions.py reach <base-ref>
@@ -116,6 +119,11 @@ PLACEHOLDERS = {
 }
 
 
+# Google's mirror of Maven Central, for both of Central's names (as incus-spawn's own CI, #2447).
+MAVEN_MIRROR = "https://maven-central.storage-download.googleapis.com/maven2/"
+MAVEN_CENTRAL = ["https://repo.maven.apache.org/maven2/", "https://repo1.maven.org/maven2/"]
+
+
 def configure(build):
     config = {}
     if os.path.exists(CONFIG):
@@ -133,6 +141,7 @@ def configure(build):
         # reach and pick never list a template that pins one: they build its parent instead.
         del named["github"]
         config.pop("github", None)
+        config["maven-mirrors"] = [{"repository": r, "mirror": MAVEN_MIRROR} for r in MAVEN_CENTRAL]
     for ns, accounts in named.items():
         config[ns] = {"accounts": {a: PLACEHOLDERS[ns]() for a in sorted(accounts)}, "default": "default"}
     os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
