@@ -15,6 +15,8 @@ searchPaths:
   - /path/to/incus-spawn-templates
 ```
 
+The templates here need isx 0.6.1 or later: `tpl-quarkus`, `tpl-infinispan` and `tpl-isx-base` use the `graalvm` tool that isx ships from that release on (GraalVM Community Edition).
+
 Then build and branch:
 
 ```shell
@@ -92,7 +94,6 @@ account. Any template whose instances must not change GitHub can pin the same ac
 |------|-------------|
 | `podman` | Podman with Docker socket compatibility, configured for Testcontainers |
 | `gradle` | Gradle 9.9.0 (installed to `/opt`, symlinked to PATH) |
-| `graalvm` | Oracle GraalVM for JDK 25 (installed to `/opt`, `native-image` on PATH) |
 | `mx` | GraalVM's `mx` build tool (cloned to `/opt/mx`, `mx` on PATH) |
 | `labsjdk` | JVMCI-enabled labsjdk fetched by `mx` into `/opt/jdks` and set as `JAVA_HOME` (param: `jdk_id`) |
 | `jtreg` | JTReg test harness (installed to `/opt`, `jtreg` on PATH) |
